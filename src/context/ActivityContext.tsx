@@ -1,10 +1,30 @@
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { UserActivity, ActivityEventType, trackActivity, getAllActivities, clearAllActivities } from '../utils/activityTracking';
+import { 
+  UserActivity, 
+  ActivityEventType, 
+  trackActivity, 
+  trackClick, 
+  trackButtonClick,
+  trackLinkClick,
+  trackFormInteraction,
+  trackHover,
+  trackScroll,
+  trackTimeSpent,
+  setupScrollTracking,
+  setupTimeTracking,
+  getAllActivities, 
+  clearAllActivities 
+} from '../utils/activityTracking';
 
 interface ActivityContextType {
   activities: UserActivity[];
   trackEvent: (eventType: ActivityEventType, eventData?: any) => void;
+  trackElementClick: (element: string, additionalData?: any) => void;
+  trackButtonPress: (buttonName: string, additionalData?: any) => void;
+  trackLinkVisit: (href: string, linkText?: string, additionalData?: any) => void;
+  trackForm: (formName: string, action: 'submit' | 'input' | 'focus' | 'blur', fieldName?: string, additionalData?: any) => void;
+  trackElementHover: (element: string, durationMs?: number, additionalData?: any) => void;
   clearActivities: () => void;
   isLoading: boolean;
   refreshActivities: () => Promise<void>;
@@ -33,6 +53,21 @@ export const ActivityProvider: React.FC<{ children: ReactNode }> = ({ children }
     loadActivities();
   }, []);
 
+  // Setup automatic tracking on mount
+  useEffect(() => {
+    // Setup scroll tracking
+    const removeScrollTracking = setupScrollTracking();
+    
+    // Setup time tracking (every 60 seconds)
+    const removeTimeTracking = setupTimeTracking(60);
+    
+    // Cleanup on unmount
+    return () => {
+      removeScrollTracking();
+      removeTimeTracking();
+    };
+  }, []);
+
   // Track a new event
   const trackEvent = async (eventType: ActivityEventType, eventData: any = {}) => {
     try {
@@ -40,6 +75,61 @@ export const ActivityProvider: React.FC<{ children: ReactNode }> = ({ children }
       setActivities(prev => [newActivity, ...prev]);
     } catch (error) {
       console.error('Failed to track event:', error);
+    }
+  };
+
+  // Track element click
+  const trackElementClick = async (element: string, additionalData: any = {}) => {
+    try {
+      const newActivity = await trackClick(element, additionalData);
+      setActivities(prev => [newActivity, ...prev]);
+    } catch (error) {
+      console.error('Failed to track click:', error);
+    }
+  };
+
+  // Track button click
+  const trackButtonPress = async (buttonName: string, additionalData: any = {}) => {
+    try {
+      const newActivity = await trackButtonClick(buttonName, additionalData);
+      setActivities(prev => [newActivity, ...prev]);
+    } catch (error) {
+      console.error('Failed to track button click:', error);
+    }
+  };
+
+  // Track link click
+  const trackLinkVisit = async (href: string, linkText: string = '', additionalData: any = {}) => {
+    try {
+      const newActivity = await trackLinkClick(href, linkText, additionalData);
+      setActivities(prev => [newActivity, ...prev]);
+    } catch (error) {
+      console.error('Failed to track link click:', error);
+    }
+  };
+
+  // Track form interaction
+  const trackForm = async (
+    formName: string, 
+    action: 'submit' | 'input' | 'focus' | 'blur', 
+    fieldName?: string, 
+    additionalData: any = {}
+  ) => {
+    try {
+      const newActivity = await trackFormInteraction(formName, action, fieldName, additionalData);
+      setActivities(prev => [newActivity, ...prev]);
+    } catch (error) {
+      console.error('Failed to track form interaction:', error);
+    }
+  };
+
+  // Track element hover
+  const trackElementHover = async (element: string, durationMs: number = 0, additionalData: any = {}) => {
+    try {
+      const newActivity = await trackHover(element, durationMs, additionalData);
+      setActivities(prev => [newActivity, ...prev]);
+    } catch (error) {
+      console.error('Failed to track hover:', error);
     }
   };
 
@@ -73,6 +163,11 @@ export const ActivityProvider: React.FC<{ children: ReactNode }> = ({ children }
     <ActivityContext.Provider value={{ 
       activities, 
       trackEvent, 
+      trackElementClick,
+      trackButtonPress,
+      trackLinkVisit,
+      trackForm,
+      trackElementHover,
       clearActivities, 
       isLoading,
       refreshActivities

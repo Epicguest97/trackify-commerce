@@ -6,33 +6,77 @@ interface ActivityContextType {
   activities: UserActivity[];
   trackEvent: (eventType: ActivityEventType, eventData?: any) => void;
   clearActivities: () => void;
+  isLoading: boolean;
+  refreshActivities: () => Promise<void>;
 }
 
 const ActivityContext = createContext<ActivityContextType | undefined>(undefined);
 
 export const ActivityProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [activities, setActivities] = useState<UserActivity[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
   // Load activities on mount
   useEffect(() => {
-    const loadedActivities = getAllActivities();
-    setActivities(loadedActivities);
+    const loadActivities = async () => {
+      setIsLoading(true);
+      try {
+        const loadedActivities = await getAllActivities();
+        setActivities(loadedActivities);
+      } catch (error) {
+        console.error('Failed to load activities:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    loadActivities();
   }, []);
 
   // Track a new event
-  const trackEvent = (eventType: ActivityEventType, eventData: any = {}) => {
-    const newActivity = trackActivity(eventType, eventData);
-    setActivities(prev => [...prev, newActivity]);
+  const trackEvent = async (eventType: ActivityEventType, eventData: any = {}) => {
+    try {
+      const newActivity = await trackActivity(eventType, eventData);
+      setActivities(prev => [newActivity, ...prev]);
+    } catch (error) {
+      console.error('Failed to track event:', error);
+    }
   };
 
   // Clear all activities
-  const clearActivities = () => {
-    clearAllActivities();
-    setActivities([]);
+  const clearActivities = async () => {
+    setIsLoading(true);
+    try {
+      await clearAllActivities();
+      setActivities([]);
+    } catch (error) {
+      console.error('Failed to clear activities:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Refresh activities
+  const refreshActivities = async () => {
+    setIsLoading(true);
+    try {
+      const loadedActivities = await getAllActivities();
+      setActivities(loadedActivities);
+    } catch (error) {
+      console.error('Failed to refresh activities:', error);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
-    <ActivityContext.Provider value={{ activities, trackEvent, clearActivities }}>
+    <ActivityContext.Provider value={{ 
+      activities, 
+      trackEvent, 
+      clearActivities, 
+      isLoading,
+      refreshActivities
+    }}>
       {children}
     </ActivityContext.Provider>
   );

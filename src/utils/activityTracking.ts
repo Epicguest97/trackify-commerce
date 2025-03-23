@@ -1,4 +1,6 @@
 
+import { supabase } from '@/integrations/supabase/client';
+
 export interface UserActivity {
   id: string;
   userId: string | null; // null for anonymous users
@@ -32,11 +34,11 @@ const getSessionId = (): string => {
 };
 
 // Track an activity
-export const trackActivity = (
+export const trackActivity = async (
   eventType: ActivityEventType,
   eventData: any = {},
   userId: string | null = null
-): UserActivity => {
+): Promise<UserActivity> => {
   const activity: UserActivity = {
     id: `activity_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
     userId,
@@ -47,36 +49,125 @@ export const trackActivity = (
     page: window.location.pathname,
   };
 
-  // Get existing activities from localStorage
-  const existingActivities = JSON.parse(localStorage.getItem('user_activities') || '[]');
-  const updatedActivities = [...existingActivities, activity];
-  
-  // Store in localStorage (in a real app, you would send this to a server)
-  localStorage.setItem('user_activities', JSON.stringify(updatedActivities));
+  // Store in Supabase
+  try {
+    await supabase.from('user_activities').insert({
+      session_id: activity.sessionId,
+      event_type: activity.eventType,
+      event_data: activity.eventData,
+      timestamp: new Date(activity.timestamp).toISOString(),
+      page: activity.page,
+      user_id: activity.userId
+    });
+  } catch (error) {
+    console.error('Error storing activity in Supabase:', error);
+  }
   
   console.log('Activity tracked:', activity);
   return activity;
 };
 
 // Get all activities
-export const getAllActivities = (): UserActivity[] => {
-  return JSON.parse(localStorage.getItem('user_activities') || '[]');
+export const getAllActivities = async (): Promise<UserActivity[]> => {
+  try {
+    const { data, error } = await supabase
+      .from('user_activities')
+      .select('*')
+      .order('timestamp', { ascending: false });
+    
+    if (error) {
+      console.error('Error fetching activities:', error);
+      return [];
+    }
+    
+    // Transform the data to match our UserActivity interface
+    return data.map(item => ({
+      id: item.id,
+      userId: item.user_id,
+      eventType: item.event_type as ActivityEventType,
+      eventData: item.event_data,
+      timestamp: new Date(item.timestamp).getTime(),
+      sessionId: item.session_id,
+      page: item.page || '',
+    }));
+  } catch (error) {
+    console.error('Error fetching activities:', error);
+    return [];
+  }
 };
 
 // Clear all activities
-export const clearAllActivities = (): void => {
-  localStorage.removeItem('user_activities');
+export const clearAllActivities = async (): Promise<void> => {
+  try {
+    const sessionId = getSessionId();
+    const { error } = await supabase
+      .from('user_activities')
+      .delete()
+      .eq('session_id', sessionId);
+    
+    if (error) {
+      console.error('Error clearing activities:', error);
+    }
+  } catch (error) {
+    console.error('Error clearing activities:', error);
+  }
 };
 
 // Get activities by type
-export const getActivitiesByType = (eventType: ActivityEventType): UserActivity[] => {
-  const allActivities = getAllActivities();
-  return allActivities.filter(activity => activity.eventType === eventType);
+export const getActivitiesByType = async (eventType: ActivityEventType): Promise<UserActivity[]> => {
+  try {
+    const { data, error } = await supabase
+      .from('user_activities')
+      .select('*')
+      .eq('event_type', eventType)
+      .order('timestamp', { ascending: false });
+    
+    if (error) {
+      console.error('Error fetching activities by type:', error);
+      return [];
+    }
+    
+    return data.map(item => ({
+      id: item.id,
+      userId: item.user_id,
+      eventType: item.event_type as ActivityEventType,
+      eventData: item.event_data,
+      timestamp: new Date(item.timestamp).getTime(),
+      sessionId: item.session_id,
+      page: item.page || '',
+    }));
+  } catch (error) {
+    console.error('Error fetching activities by type:', error);
+    return [];
+  }
 };
 
 // Get activities for current session
-export const getCurrentSessionActivities = (): UserActivity[] => {
-  const allActivities = getAllActivities();
-  const currentSessionId = getSessionId();
-  return allActivities.filter(activity => activity.sessionId === currentSessionId);
+export const getCurrentSessionActivities = async (): Promise<UserActivity[]> => {
+  try {
+    const sessionId = getSessionId();
+    const { data, error } = await supabase
+      .from('user_activities')
+      .select('*')
+      .eq('session_id', sessionId)
+      .order('timestamp', { ascending: false });
+    
+    if (error) {
+      console.error('Error fetching session activities:', error);
+      return [];
+    }
+    
+    return data.map(item => ({
+      id: item.id,
+      userId: item.user_id,
+      eventType: item.event_type as ActivityEventType,
+      eventData: item.event_data,
+      timestamp: new Date(item.timestamp).getTime(),
+      sessionId: item.session_id,
+      page: item.page || '',
+    }));
+  } catch (error) {
+    console.error('Error fetching session activities:', error);
+    return [];
+  }
 };

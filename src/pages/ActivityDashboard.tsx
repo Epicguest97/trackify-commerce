@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -9,10 +8,10 @@ import { ActivityEventType, UserActivity } from '@/utils/activityTracking';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { DownloadCloud, RefreshCcw, Trash2 } from 'lucide-react';
+import { DownloadCloud, RefreshCcw, Trash2, Loader2 } from 'lucide-react';
 
 const ActivityDashboard = () => {
-  const { activities, trackEvent, clearActivities } = useActivity();
+  const { activities, trackEvent, clearActivities, isLoading, refreshActivities } = useActivity();
   const [activeTab, setActiveTab] = useState('overview');
   
   // Track page view on mount
@@ -112,6 +111,12 @@ const ActivityDashboard = () => {
     trackEvent(ActivityEventType.CLICK, { element: 'download_activities_button' });
   };
 
+  // Handle refresh activities
+  const handleRefreshActivities = async () => {
+    trackEvent(ActivityEventType.CLICK, { element: 'refresh_activities_button' });
+    await refreshActivities();
+  };
+
   return (
     <div className="min-h-screen pt-24 pb-20">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
@@ -125,7 +130,22 @@ const ActivityDashboard = () => {
             <Button 
               variant="outline" 
               className="flex items-center"
+              onClick={handleRefreshActivities}
+              disabled={isLoading}
+            >
+              {isLoading ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <RefreshCcw className="h-4 w-4 mr-2" />
+              )}
+              Refresh
+            </Button>
+            
+            <Button 
+              variant="outline" 
+              className="flex items-center"
               onClick={handleDownloadActivities}
+              disabled={isLoading || activities.length === 0}
             >
               <DownloadCloud className="h-4 w-4 mr-2" />
               Export Data
@@ -135,6 +155,7 @@ const ActivityDashboard = () => {
               variant="destructive" 
               className="flex items-center"
               onClick={handleClearActivities}
+              disabled={isLoading || activities.length === 0}
             >
               <Trash2 className="h-4 w-4 mr-2" />
               Clear Data
@@ -142,14 +163,22 @@ const ActivityDashboard = () => {
           </div>
         </div>
         
-        {activities.length === 0 ? (
+        {isLoading ? (
+          <Card className="p-8 text-center">
+            <CardContent className="pt-6 flex flex-col items-center">
+              <Loader2 className="h-8 w-8 animate-spin mb-4 text-black/70" />
+              <h3 className="text-lg font-medium mb-2">Loading activity data...</h3>
+              <p className="text-gray-500">Please wait while we fetch your activity data.</p>
+            </CardContent>
+          </Card>
+        ) : activities.length === 0 ? (
           <Card className="p-8 text-center">
             <CardContent className="pt-6">
               <h3 className="text-lg font-medium mb-2">No activity data yet</h3>
               <p className="text-gray-500 mb-6">Start browsing products and interacting with the site to generate activity data.</p>
               <Button 
                 variant="outline" 
-                onClick={() => window.location.reload()}
+                onClick={handleRefreshActivities}
                 className="flex items-center mx-auto"
               >
                 <RefreshCcw className="h-4 w-4 mr-2" />
@@ -324,3 +353,4 @@ const ActivityDashboard = () => {
 };
 
 export default ActivityDashboard;
+
